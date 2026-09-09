@@ -76,6 +76,7 @@ public class Order : AggregateRoot
         if (!_items.Any())
             throw new DomainException("Não é possível confirmar um pedido sem itens.");
 
+        Status = OrderStatus.Confirmed;
         RaiseDomainEvent(new OrderCreatedEvent(Id, TotalAmount.Amount, TotalAmount.Currency));
     }
 
@@ -85,8 +86,8 @@ public class Order : AggregateRoot
     /// </summary>
     public void StartProcessing()
     {
-        if (Status != OrderStatus.PendingPayment)
-            throw new DomainException($"Só é possível iniciar o processamento de pedidos pendentes. Status atual: {Status}.");
+        if (Status != OrderStatus.Confirmed)
+            throw new DomainException($"Só é possível iniciar o processamento de pedidos confirmados. Status atual: {Status}.");
 
         Status = OrderStatus.Processing;
     }

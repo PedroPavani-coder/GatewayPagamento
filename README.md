@@ -1,112 +1,81 @@
-# PaymentGateway — Checkout Assíncrono (DDD)
+# 💳 PaymentGateway
 
-Projeto de portfolio: um gateway de pagamentos com checkout assíncrono, construído em .NET
-seguindo os princípios de Domain-Driven Design (DDD).
+Meu projeto de portfolio: um gateway de pagamentos com checkout assíncrono, feito em .NET
+estudando DDD (Domain-Driven Design) na prática. Tô construindo isso aos poucos, camada por
+camada, pra realmente entender o porquê de cada decisão (e não só copiar um template pronto).
 
-## Stack planejada
-- **.NET 8**
-- **SQL Server** (persistência)
-- **RabbitMQ** (mensageria assíncrona)
-- **Docker** (para subir SQL Server e RabbitMQ localmente)
+## Stack
 
-## Status do projeto (vamos evoluindo aos poucos)
+- .NET 8
+- SQL Server (banco de dados)
+- RabbitMQ (fila de mensagens, pra processar pagamento de forma assíncrona)
+- Docker (pra subir banco e fila sem precisar instalar nada na máquina)
 
-- [x] **Passo 1 — Camada Domain**: entidades, value objects e regras de negócio puras
-- [x] **Passo 2 — Testes unitários** do Domain (xUnit + FluentAssertions)
-- [ ] Passo 3 — Camada Application (casos de uso / CQRS)
-- [ ] Passo 4 — Camada Infrastructure (EF Core + RabbitMQ)
-- [ ] Passo 5 — Camada Api (controllers)
-- [ ] Passo 6 — Worker de processamento assíncrono
-- [ ] Passo 7 — Docker Compose (SQL Server + RabbitMQ + Api + Worker)
+## Como tá o progresso
 
-## O que foi feito no Passo 1
+- [x] Domain — as entidades e regras de negócio (o coração do sistema)
+- [x] Testes unitários do Domain
+- [ ] Application — os casos de uso (o que a API realmente faz)
+- [ ] Infrastructure — banco de dados + fila de mensagens
+- [ ] Api — os endpoints
+- [ ] Worker — quem processa o pagamento em segundo plano
+- [ ] Docker Compose — subir tudo junto com um comando só
 
-Criamos o projeto `PaymentGateway.Domain`, que é o núcleo do sistema. Ele **não depende de
-nada externo** (nem EF Core, nem RabbitMQ, nem ASP.NET) — só de C# puro. Isso é proposital:
-no DDD, o Domain é o coração do sistema, e ele não pode saber COMO os dados são
-persistidos ou COMO as mensagens são enviadas, apenas O QUE deve acontecer.
+## A ideia do projeto
 
-### Estrutura criada
+É um checkout **assíncrono**. Isso quer dizer que quando o cliente confirma a compra, a
+API não fica "travada" esperando o pagamento ser aprovado. Ela:
 
+1. Recebe o pedido, salva como "pendente" e devolve resposta na hora (rápido!)
+2. Manda uma mensagem pra uma fila (RabbitMQ)
+3. Um "Worker" (um processo rodando em segundo plano) pega essa mensagem e processa o
+   pagamento com calma
+4. O cliente consulta depois se o pagamento foi aprovado ou não
+
+Isso é bem parecido com como funciona de verdade em gateways de pagamento reais tipo
+Stripe/PagSeguro — o pagamento raramente é instantâneo pro seu sistema, ele só te avisa
+depois (via fila ou webhook).
+
+## O que eu já fiz
+
+### Camada Domain
+
+Essa é a camada que não depende de nada — nem banco, nem API, nem nada externo. Só as
+regras do negócio em C# puro. A ideia é que, se eu quiser trocar SQL Server por outro
+banco, ou RabbitMQ por outra fila, essa camada aqui nem precisa mudar uma linha.
+
+O que tem aqui:
+
+- `Order` — o Pedido. É o "agregado principal": toda mudança de estado do pedido passa
+  por um método dele (`AddItem`, `ConfirmCheckout`, `ApprovePayment`...). Isso evita que
+  o pedido fique num estado esquisito, tipo "pago mas cancelado" ao mesmo tempo.
+- `Money` — em vez de usar `decimal` solto pra representar valor, criei esse objeto que
+  já garante que não existe valor negativo e não deixa somar Real com Dólar sem querer.
+- Domain Events (`OrderCreatedEvent`, `PaymentApprovedEvent`, `PaymentDeclinedEvent`) —
+  são "avisos" que o pedido dispara quando algo importante acontece. Vou usar isso depois
+  pra saber quando publicar uma mensagem no RabbitMQ.
+
+### Testes unitários
+
+Criei testes pro `Order` e pro `Money` usando xUnit + FluentAssertions. Já apanhei um
+bug real com isso (esqueci de atualizar o status do pedido depois de confirmar o
+checkout 😅) — o que só reforça que vale a pena escrever teste mesmo em projeto pequeno.
+
+## Como rodar na sua máquina
+
+Precisa ter o [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) instalado
+(`dotnet --version` pra conferir).
+
+```bash
+# compilar
+dotnet build
+
+# rodar os testes
+dotnet test
 ```
-src/PaymentGateway.Domain/
-├── Common/
-│   ├── Entity.cs          → Classe base para entidades (identidade por Id)
-│   ├── AggregateRoot.cs   → Classe base para agregados (gerencia Domain Events)
-│   ├── ValueObject.cs     → Classe base para objetos de valor (igualdade por valor)
-│   └── IDomainEvent.cs    → Contrato para eventos de domínio
-├── Exceptions/
-│   └── DomainException.cs → Exceção para violação de regras de negócio
-├── ValueObjects/
-│   └── Money.cs           → Valor monetário seguro (evita valores negativos, mistura de moedas)
-└── Orders/
-    ├── Order.cs           → Aggregate Root: o Pedido, com todas as regras de checkout
-    ├── OrderItem.cs       → Entidade filha do agregado Order
-    ├── OrderStatus.cs     → Enum com os estados possíveis do pedido
-    └── Events/
-        ├── OrderCreatedEvent.cs
-        ├── PaymentApprovedEvent.cs
-        └── PaymentDeclinedEvent.cs
-```
-
-### Fluxo de negócio já modelado
-
-```
-Order.Create()        → cria pedido com status PendingPayment
-Order.AddItem()       → adiciona itens (só antes de confirmar)
-Order.ConfirmCheckout() → valida e dispara OrderCreatedEvent
-Order.StartProcessing() → Worker pega da fila (PendingPayment -> Processing)
-Order.ApprovePayment()  → Processing -> Paid (dispara PaymentApprovedEvent)
-Order.DeclinePayment()  → Processing -> Declined (dispara PaymentDeclinedEvent)
-Order.Cancel()          → cancela, se ainda não foi processado
-```
-
-## O que foi feito no Passo 2
-
-Criamos o projeto `PaymentGateway.Domain.Tests`, usando:
-- **xUnit**: framework de testes (atributos `[Fact]` para um teste único, `[Theory]` +
-  `[InlineData]` para rodar o mesmo teste com várias entradas diferentes)
-- **FluentAssertions**: deixa as asserções mais legíveis (`resultado.Should().Be(x)`
-  em vez de `Assert.Equal(x, resultado)`)
-
-### Estrutura criada
-
-```
-tests/PaymentGateway.Domain.Tests/
-├── PaymentGateway.Domain.Tests.csproj
-├── ValueObjects/
-│   └── MoneyTests.cs   → testa criação, soma e igualdade do Value Object Money
-└── Orders/
-    └── OrderTests.cs   → testa todo o ciclo de vida do agregado Order
-```
-
-Os testes de `OrderTests.cs` cobrem:
-- Criação válida e inválida de pedido
-- Adição de itens e cálculo do total
-- Regra de que não dá pra confirmar checkout sem itens
-- Regra de que não dá pra editar pedido já confirmado
-- Transições de status (Pending → Processing → Paid / Declined)
-- Que os Domain Events corretos são disparados em cada transição
-- Regra de que não dá pra cancelar pedido já pago
-
-## Como rodar/verificar este passo na sua máquina
-
-1. Instale o [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (confira com `dotnet --version`)
-2. Descompacte este projeto em uma pasta
-3. Na raiz (`PaymentGateway/`), rode:
-   ```bash
-   dotnet build
-   ```
-4. Para rodar os testes:
-   ```bash
-   dotnet test
-   ```
-   Você deve ver algo como `Passed! - Failed: 0, Passed: 17` no final. Isso confirma
-   que todas as regras de negócio estão se comportando como esperado.
 
 ## Próximo passo
 
-Seguimos para a camada **Application**, onde vamos criar os casos de uso (Commands/Queries)
-que vão orquestrar o Domain — por exemplo, um `CriarPedidoCommandHandler` que recebe um
-DTO da API, monta o `Order`, e chama um repositório (que ainda não existe — só a
-interface, seguindo o princípio de Inversão de Dependência do DDD).
+Vou começar a camada **Application** — onde entram os "casos de uso" (tipo
+`CriarPedido`, `ConfirmarCheckout`) que vão conectar a API com o Domain. É aqui que
+também entra o padrão Repository.

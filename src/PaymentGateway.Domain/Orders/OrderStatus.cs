@@ -10,18 +10,21 @@ namespace PaymentGateway.Domain.Orders;
 /// </summary>
 public enum OrderStatus
 {
-    /// <summary>Pedido criado, aguardando envio para a fila de processamento.</summary>
+    /// <summary>Pedido criado, cliente ainda pode adicionar/remover itens.</summary>
     PendingPayment = 0,
 
+    /// <summary>Checkout confirmado (não pode mais editar), aguardando o Worker pegar da fila.</summary>
+    Confirmed = 1,
+
     /// <summary>Mensagem já foi consumida pelo Worker, pagamento sendo processado no gateway externo.</summary>
-    Processing = 1,
+    Processing = 2,
 
     /// <summary>Pagamento aprovado com sucesso.</summary>
-    Paid = 2,
+    Paid = 3,
 
     /// <summary>Pagamento recusado pelo provedor (cartão sem limite, fraude, etc).</summary>
-    Declined = 3,
+    Declined = 4,
 
     /// <summary>Pedido cancelado antes de concluir o pagamento.</summary>
-    Cancelled = 4
+    Cancelled = 5
 }
