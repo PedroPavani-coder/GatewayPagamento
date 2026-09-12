@@ -17,7 +17,7 @@ camada, pra realmente entender o porquê de cada decisão (e não só copiar um 
 - [x] Testes unitários do Domain
 - [x] Application — os casos de uso (o que a API realmente faz)
 - [x] Infrastructure — banco de dados + fila de mensagens
-- [ ] Api — os endpoints
+- [x] Api — os endpoints
 - [ ] Worker — quem processa o pagamento em segundo plano
 - [ ] Docker Compose — subir tudo junto com um comando só
 
@@ -105,6 +105,24 @@ app cair bem entre essas duas etapas, o evento se perde. Em produção, o ideal 
 **Transactional Outbox Pattern**. Deixei isso anotado como próximo estudo depois que o
 projeto estiver rodando ponta a ponta.
 
+### Camada Api
+
+Agora sim, os endpoints HTTP de verdade:
+
+- `POST /api/orders` — cria um pedido e já confirma o checkout
+- `GET /api/orders/{id}` — consulta o status atual de um pedido
+
+O `OrdersController` é bem enxuto de propósito: ele só converte o request HTTP num
+Command/Query do MediatR e devolve a resposta. Nenhuma regra de negócio mora aqui.
+
+Também adicionei um `ExceptionHandlingMiddleware`, que fica "escutando" qualquer
+exceção que role em qualquer requisição:
+- `DomainException` (erro de regra de negócio) → vira HTTP 400 com uma mensagem clara
+- Qualquer outro erro inesperado → vira HTTP 500 genérico (sem expor detalhes internos)
+
+O `Program.cs` é onde tudo se junta: `AddApplication()` + `AddInfrastructure()` +
+Controllers + Swagger.
+
 ## Como rodar na sua máquina
 
 Precisa ter o [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) instalado
@@ -118,12 +136,13 @@ dotnet build
 dotnet test
 ```
 
-Pra rodar de fato com banco e fila, ainda falta o Passo 6 (Docker Compose) — por
-enquanto a Infrastructure só compila, mas não tem como testar de ponta a ponta ainda
-(falta a Api pra expor os endpoints).
+Pra rodar a Api de fato (`dotnet run --project src/PaymentGateway.Api`), ainda falta
+ter um SQL Server e um RabbitMQ rodando — isso é o próximo passo (Docker Compose).
+Sem eles, a Api até sobe, mas qualquer chamada que tente salvar no banco ou publicar
+na fila vai dar erro de conexão.
 
 ## Próximo passo
 
-Camada **Api**: os Controllers (ou Minimal APIs) que expõem os endpoints HTTP, chamando
-os Commands/Queries da Application via MediatR, e o `Program.cs` juntando tudo
-(`AddApplication()` + `AddInfrastructure()`).
+**Docker Compose**: subir SQL Server + RabbitMQ com um comando só, e finalmente
+conseguir testar o fluxo completo (criar pedido → ver no banco → ver mensagem
+chegando no RabbitMQ). Depois disso, criamos o **Worker** que consome a fila.

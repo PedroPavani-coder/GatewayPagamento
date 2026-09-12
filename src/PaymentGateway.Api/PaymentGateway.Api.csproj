@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>PaymentGateway.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Swashbuckle gera a documentação Swagger/OpenAPI automaticamente a partir
+         dos nossos Controllers, e nos dá aquela telinha /swagger pra testar a API
+         direto do navegador, sem precisar do Postman. -->
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.7.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PaymentGateway.Application\PaymentGateway.Application.csproj" />
+    <ProjectReference Include="..\PaymentGateway.Infrastructure\PaymentGateway.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
