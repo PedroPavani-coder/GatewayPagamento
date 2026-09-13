@@ -18,8 +18,8 @@ camada, pra realmente entender o porquê de cada decisão (e não só copiar um 
 - [x] Application — os casos de uso (o que a API realmente faz)
 - [x] Infrastructure — banco de dados + fila de mensagens
 - [x] Api — os endpoints
-- [ ] Worker — quem processa o pagamento em segundo plano
-- [ ] Docker Compose — subir tudo junto com um comando só
+- [x] Docker Compose — subir tudo junto com um comando só
+- [x] Worker — quem processa o pagamento em segundo plano
 
 ## A ideia do projeto
 
@@ -123,26 +123,100 @@ exceção que role em qualquer requisição:
 O `Program.cs` é onde tudo se junta: `AddApplication()` + `AddInfrastructure()` +
 Controllers + Swagger.
 
-## Como rodar na sua máquina
+### Docker Compose
 
-Precisa ter o [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) instalado
-(`dotnet --version` pra conferir).
+Criei um `docker-compose.yml` na raiz do projeto que sobe:
+- **SQL Server** (via imagem do Azure SQL Edge, porta 1433) — mesma senha que já tá
+  no `appsettings.json`. Optei pelo Azure SQL Edge em vez do SQL Server 2022 "cheio"
+  porque ele é mais leve e mais estável rodando em Docker Desktop/WSL2 no Windows
+  (cheguei a apanhar de um crash no container do SQL Server 2022 puro). Pra tudo que
+  a gente precisa aqui (T-SQL, EF Core), o comportamento é idêntico.
+- **RabbitMQ** com o painel de administração (porta 15672) — dá pra acessar
+  `http://localhost:15672` (usuário/senha: `guest`/`guest`) e ver as filas e
+  mensagens na telinha, o que ajuda MUITO a entender o que tá acontecendo.
 
+Os dados dos dois ficam salvos em **volumes nomeados do Docker** (gerenciados pelo
+próprio Docker, não numa pasta visível do projeto) — isso evita problemas de
+compatibilidade entre o SQL Server e o sistema de arquivos do Windows.
+
+## Como rodar na sua máquina (do zero)
+
+Pré-requisitos: [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) e
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) instalados e rodando.
+
+**1. Suba o banco e a fila:**
 ```bash
-# compilar
-dotnet build
+docker compose up -d
+```
+(o `-d` roda em segundo plano; confira com `docker ps` se os dois containers subiram)
 
-# rodar os testes
+**2. Instale a ferramenta de linha de comando do EF Core** (só precisa fazer isso uma vez):
+```bash
+dotnet tool install --global dotnet-ef
+```
+
+**3. Crie a Migration** (o "script" que descreve as tabelas a serem criadas):
+```bash
+dotnet ef migrations add InitialCreate --project src/PaymentGateway.Infrastructure --startup-project src/PaymentGateway.Api
+```
+
+**4. Aplique a Migration no banco** (agora sim cria as tabelas de verdade):
+```bash
+dotnet ef database update --project src/PaymentGateway.Infrastructure --startup-project src/PaymentGateway.Api
+```
+
+**5. Abra DOIS terminais** (a Api e o Worker precisam rodar ao mesmo tempo):
+
+Terminal 1 — a Api:
+```bash
+dotnet run --project src/PaymentGateway.Api
+```
+
+Terminal 2 — o Worker:
+```bash
+dotnet run --project src/PaymentGateway.Worker
+```
+
+Isso deve abrir o navegador direto no Swagger (`/swagger`), onde dá pra testar o
+`POST /api/orders` e o `GET /api/orders/{id}` sem precisar de Postman.
+
+**6. Teste o fluxo completo de checkout assíncrono:**
+- Crie um pedido pelo Swagger (`POST /api/orders`)
+- Olhe o terminal do **Worker**: em alguns segundos devem aparecer os logs
+  "Mensagem recebida" e "APROVADO"/"RECUSADO"
+- Consulte o pedido de novo (`GET /api/orders/{id}`) — o `status` deve ter mudado
+  de `Confirmed` pra `Paid` ou `Declined`!
+
+**7. (opcional) Rode os testes automatizados também:**
+```bash
 dotnet test
 ```
 
-Pra rodar a Api de fato (`dotnet run --project src/PaymentGateway.Api`), ainda falta
-ter um SQL Server e um RabbitMQ rodando — isso é o próximo passo (Docker Compose).
-Sem eles, a Api até sobe, mas qualquer chamada que tente salvar no banco ou publicar
-na fila vai dar erro de conexão.
+### Worker
 
-## Próximo passo
+Essa é a peça que **fecha o ciclo** do checkout assíncrono. É um projeto separado
+(`PaymentGateway.Worker`), do tipo Worker Service — ele não tem endpoint HTTP nenhum,
+só fica rodando em segundo plano, escutando a fila.
 
-**Docker Compose**: subir SQL Server + RabbitMQ com um comando só, e finalmente
-conseguir testar o fluxo completo (criar pedido → ver no banco → ver mensagem
-chegando no RabbitMQ). Depois disso, criamos o **Worker** que consome a fila.
+O que ele faz:
+1. Conecta no RabbitMQ e cria uma fila vinculada ao mesmo exchange que a Api publica
+2. Fica esperando mensagens `OrderCreatedEvent` chegarem
+3. Pra cada mensagem, dispara o `ProcessOrderPaymentCommand` (um Command novo criado
+   na Application) — que simula uma checagem com um provedor de pagamento externo
+   (2 segundos de espera + 80% de chance de aprovar) e chama `order.ApprovePayment()`
+   ou `order.DeclinePayment()`
+4. Salva via `UnitOfWork` — que, como já configuramos na Infrastructure, também
+   publica os eventos `PaymentApprovedEvent`/`PaymentDeclinedEvent` de volta na fila
+
+Detalhe de arquitetura que vale destacar: criei uma classe `OrderCreatedMessage`
+separada, só pra representar "o formato da mensagem que trafega na fila" — em vez de
+reaproveitar direto a classe `OrderCreatedEvent` do Domain. Isso evita acoplar o
+"contrato entre sistemas" com uma classe interna que pode mudar por outros motivos.
+
+## Ideias pra evoluir ainda mais
+
+- CI/CD com GitHub Actions rodando os testes a cada push
+- Deploy real (Railway/Render) com link no README
+- Testes de integração com Testcontainers
+- Transactional Outbox Pattern (mencionado lá na seção da Infrastructure)
+- Autenticação/autorização na Api
