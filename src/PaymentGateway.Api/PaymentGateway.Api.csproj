@@ -12,6 +12,14 @@
          dos nossos Controllers, e nos dá aquela telinha /swagger pra testar a API
          direto do navegador, sem precisar do Postman. -->
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.7.3" />
+    <!-- Necessário aqui (mesmo o DbContext morando na Infrastructure) porque as
+         ferramentas de linha de comando do EF Core (dotnet ef migrations) exigem
+         esse pacote no projeto de inicialização (parâmetro startup-project), não só
+         onde o DbContext está definido. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
