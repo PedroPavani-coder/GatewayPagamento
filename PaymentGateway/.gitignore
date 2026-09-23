@@ -1,0 +1,48 @@
+## ===== Build outputs =====
+# Pastas geradas toda vez que você compila (dotnet build/run). Não fazem sentido no
+# controle de versão porque são geradas automaticamente a partir do seu código-fonte.
+[Bb]in/
+[Oo]bj/
+
+## ===== Visual Studio =====
+.vs/
+*.user
+*.suo
+
+## ===== VS Code =====
+# Descomente as linhas abaixo se você NÃO quiser compartilhar suas configs de editor.
+# Muita gente prefere manter o .vscode/settings.json versionado para padronizar o time,
+# então deixo como sugestão, não como regra fixa.
+# .vscode/
+
+## ===== Rider (JetBrains) =====
+.idea/
+*.sln.iml
+
+## ===== Resultados de teste e cobertura =====
+[Tt]est[Rr]esult*/
+*.trx
+coverage.*.xml
+coverage.opencover.xml
+
+## ===== Segredos e configs locais (IMPORTANTE) =====
+# Nunca suba senhas de banco, connection strings ou chaves de API!
+# O appsettings.Development.json normalmente tem dados sensíveis do seu ambiente local.
+appsettings.Development.json
+appsettings.*.local.json
+*.env
+.env
+
+## ===== Pacotes NuGet =====
+*.nupkg
+*.snupkg
+**/packages/*
+!**/packages/build/
+
+## ===== Docker =====
+# Caso você crie volumes locais de dados do SQL Server/RabbitMQ via docker-compose
+docker-data/
+
+## ===== Sistema operacional =====
+.DS_Store
+Thumbs.db

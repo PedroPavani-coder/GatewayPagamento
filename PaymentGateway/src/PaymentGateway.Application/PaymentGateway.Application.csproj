@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>PaymentGateway.Application</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- MediatR: implementa o padrão Mediator, usado aqui pra separar Commands (escrita)
+         de Queries (leitura) — o famoso CQRS. Cada Command/Query tem seu próprio Handler,
+         então cada caso de uso fica isolado num arquivo pequeno e fácil de testar. -->
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PaymentGateway.Domain\PaymentGateway.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,30 @@
+services:
+  sqlserver:
+    # Usamos o Azure SQL Edge em vez do SQL Server 2022 "cheio" porque ele é mais leve
+    # e, na prática, mais estável rodando em Docker Desktop com WSL2 no Windows. Ele
+    # entende a mesma linguagem T-SQL, então pro nosso projeto não muda nada.
+    image: mcr.microsoft.com/azure-sql-edge:latest
+    container_name: paymentgateway-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=YourStrong@Passw0rd
+    ports:
+      - "1433:1433"
+    volumes:
+      # Volume NOMEADO (gerenciado pelo próprio Docker) em vez de apontar pra uma
+      # pasta do Windows. Isso evita problemas conhecidos de compatibilidade entre o
+      # SQL Server e o sistema de arquivos NTFS do Windows quando rodando via WSL2.
+      - sqlserver-data:/var/opt/mssql
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: paymentgateway-rabbitmq
+    ports:
+      - "5672:5672"   # porta usada pela nossa Api pra publicar mensagens
+      - "15672:15672" # painel web de administração (management UI)
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+volumes:
+  sqlserver-data:
+  rabbitmq-data:
