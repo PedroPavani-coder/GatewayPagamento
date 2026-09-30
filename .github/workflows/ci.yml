@@ -1,0 +1,53 @@
+# CI = Continuous Integration (Integração Contínua). A ideia é simples: toda vez que
+# alguém dá "git push", o GitHub sobe uma máquina virtual do zero, baixa o código, e
+# roda a compilação + os testes automaticamente — sem depender de ninguém lembrar de
+# rodar "dotnet test" na mão antes de mandar o código pro repositório principal.
+name: CI
+
+# Define QUANDO esse workflow roda: em todo push na branch main, e também quando
+# alguém abre um Pull Request pra main (útil pra revisar código antes de mesclar).
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    name: Build e Testes
+    # ubuntu-latest já vem com o Docker instalado e rodando, o que é essencial aqui:
+    # nossos testes de integração usam Testcontainers, que precisa do Docker pra
+    # subir o container do SQL Server durante os testes.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar o código do repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar o .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # Isso guarda os pacotes NuGet já baixados entre uma execução e outra do
+      # workflow, pra não precisar baixar tudo de novo toda vez — deixa o CI mais
+      # rápido depois da primeira execução.
+      - name: Cachear pacotes do NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restaurar dependências
+        run: dotnet restore
+
+      - name: Compilar o projeto (Release)
+        run: dotnet build --no-restore --configuration Release
+
+      # Roda TODOS os testes: unitários do Domain, unitários da Application (com
+      # Moq) e os de integração (com Testcontainers). Se qualquer um falhar, esse
+      # workflow falha, e o GitHub mostra um X vermelho no commit/PR.
+      - name: Rodar todos os testes
+        run: dotnet test --no-build --configuration Release --verbosity normal

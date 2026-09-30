@@ -1,5 +1,7 @@
 # 💳 PaymentGateway
 
+![CI](https://github.com/PedroPavani-coder/GatewayPagamento/actions/workflows/ci.yml/badge.svg)
+
 Meu projeto de portfolio: um gateway de pagamentos com checkout assíncrono, feito em .NET
 estudando DDD (Domain-Driven Design) na prática. Tô construindo isso aos poucos, camada por
 camada, pra realmente entender o porquê de cada decisão (e não só copiar um template pronto).
@@ -275,9 +277,29 @@ funcionarem (o Testcontainers precisa dele pra subir o container). Rodar só
 Docker não estiver rodando, só os testes de integração vão falhar, os outros
 continuam passando normalmente.
 
+### CI (Integração Contínua)
+
+Criei um workflow do **GitHub Actions** (`.github/workflows/ci.yml`) que roda
+automaticamente a cada `git push` ou Pull Request pra branch `main`:
+
+1. Baixa o código numa máquina virtual do GitHub (Ubuntu)
+2. Instala o .NET 8 SDK
+3. Restaura os pacotes NuGet (com cache, pra ficar mais rápido nas próximas vezes)
+4. Compila o projeto inteiro em modo Release
+5. Roda **todos** os testes — unitários do Domain, unitários da Application (com Moq)
+   e os de integração (com Testcontainers, já que os runners do GitHub Actions vêm
+   com Docker instalado)
+
+Se qualquer parte falhar, o commit/PR fica marcado com um X vermelho no GitHub — e o
+badge lá no topo deste README mostra o status mais recente (passando ✅ ou falhando ❌).
+
+Isso significa que, a partir de agora, é literalmente impossível eu "esquecer" de
+rodar os testes antes de subir uma mudança: o próprio GitHub roda por mim, e eu fico
+sabendo na hora se quebrei alguma coisa.
+
 ## Ideias pra evoluir ainda mais
 
-- CI/CD com GitHub Actions rodando os testes a cada push
-- Deploy real (Railway/Render) com link no README
+- Deploy real (Railway/Render) com link no README, e CD (Continuous Deployment) no
+  próprio workflow do GitHub Actions, publicando automaticamente a cada push na main
 - Transactional Outbox Pattern (mencionado lá na seção da Infrastructure)
 - Tabela de Usuários de verdade (ASP.NET Core Identity) no lugar do login fixo
