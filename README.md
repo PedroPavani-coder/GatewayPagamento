@@ -244,10 +244,40 @@ commitada no repositório só porque é uma chave de **desenvolvimento local**. 
 aplicação de produção, isso jamais deveria estar no controle de versão — viria de uma
 variável de ambiente ou de um cofre de segredos.
 
+### Testes de integração
+
+Diferente dos testes unitários (que usam Mocks e nunca tocam em nada real), os testes
+em `PaymentGateway.IntegrationTests` testam a Api **de ponta a ponta**, via HTTP de
+verdade, contra um **SQL Server real** — só que descartável.
+
+Duas peças tornam isso possível:
+
+- **Testcontainers**: sobe um container Docker de SQL Server do zero, automaticamente,
+  antes dos testes rodarem, e derruba ele no final. Cada execução da suíte de testes
+  começa com um banco 100% limpo.
+- **WebApplicationFactory&lt;Program&gt;** (do próprio ASP.NET Core): hospeda a Api
+  inteira em memória — Controllers, Middlewares, injeção de dependência, tudo
+  funcionando de verdade — sem precisar publicar nada nem abrir uma porta de rede real.
+
+O `RabbitMqMessagePublisher` real é substituído por um `FakeMessagePublisher` só
+durante os testes (ver `Fakes/FakeMessagePublisher.cs`), porque o foco aqui é validar
+o fluxo HTTP + banco de dados; testar a mensageria de ponta a ponta também seria uma
+evolução natural, mas exigiria subir um container de RabbitMQ à parte.
+
+Os testes cobrem: criar pedido autenticado (201), criar pedido sem token (401),
+criar pedido sem itens (400 — provando que o Middleware de exceção funciona também
+via HTTP de verdade), consultar pedido existente (200) e consultar pedido inexistente
+(404).
+
+⚠️ **Pré-requisito**: o Docker Desktop precisa estar aberto e rodando pra esses testes
+funcionarem (o Testcontainers precisa dele pra subir o container). Rodar só
+`dotnet test` na raiz executa TODOS os testes, incluindo os de integração — se o
+Docker não estiver rodando, só os testes de integração vão falhar, os outros
+continuam passando normalmente.
+
 ## Ideias pra evoluir ainda mais
 
 - CI/CD com GitHub Actions rodando os testes a cada push
 - Deploy real (Railway/Render) com link no README
-- Testes de integração com Testcontainers
 - Transactional Outbox Pattern (mencionado lá na seção da Infrastructure)
 - Tabela de Usuários de verdade (ASP.NET Core Identity) no lugar do login fixo

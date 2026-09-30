@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>PaymentGateway.IntegrationTests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="FluentAssertions" Version="6.12.1" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+
+    <!-- WebApplicationFactory: sobe a Api inteira em memória, permitindo testar via
+         HttpClient de verdade, sem precisar publicar/hospedar nada. -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.10" />
+
+    <!-- Testcontainers: sobe um container Docker de verdade (aqui, SQL Server)
+         automaticamente antes dos testes rodarem, e derruba ele no final. -->
+    <PackageReference Include="Testcontainers.MsSql" Version="3.10.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PaymentGateway.Api\PaymentGateway.Api.csproj" />
+    <ProjectReference Include="..\..\src\PaymentGateway.Infrastructure\PaymentGateway.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

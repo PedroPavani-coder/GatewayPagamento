@@ -97,3 +97,10 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// O Program.cs usa "top-level statements" (sem uma classe Program explícita), mas o
+// .NET gera uma classe interna chamada Program por baixo dos panos. Essa linha só
+// torna essa classe PÚBLICA e PARCIAL, pra que o projeto de testes de integração
+// consiga referenciá-la através do WebApplicationFactory<Program> (explicado lá no
+// projeto de testes). Sem isso, os testes nem compilariam.
+public partial class Program { }
