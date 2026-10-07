@@ -297,6 +297,23 @@ Isso significa que, a partir de agora, é literalmente impossível eu "esquecer"
 rodar os testes antes de subir uma mudança: o próprio GitHub roda por mim, e eu fico
 sabendo na hora se quebrei alguma coisa.
 
+### Teste de carga
+
+Na pasta [`loadtests/`](loadtests/) tem scripts do [k6](https://grafana.com/docs/k6/latest/)
+(gratuito) pra medir o quanto a Api aguenta:
+
+- `load-test.js` — carga realista: sobe até 50 usuários virtuais aos poucos
+- `stress-test.js` — estresse: sobe até 300 usuários sem pausa, pra achar o ponto de quebra
+
+Cada usuário virtual cria um pedido (`POST /api/orders`) e consulta ele
+(`GET /api/orders/{id}`), já autenticado com JWT. O passo a passo completo (instalar,
+preparar o ambiente, rodar e ler os números) está em
+[`loadtests/README.md`](loadtests/README.md).
+
+A ideia é rodar **antes e depois** de cada melhoria de resistência (como o rate
+limiting) e comparar os números na mesma máquina. Os resultados ficam registrados na
+tabela do `loadtests/README.md`.
+
 ## Ideias pra evoluir ainda mais
 
 - Deploy real (Railway/Render) com link no README, e CD (Continuous Deployment) no
